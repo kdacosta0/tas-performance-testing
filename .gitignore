@@ -1,5 +1,5 @@
 # Created by https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,macos
-# Edit at https://www.toptal.com/developers/gitignore?templates=go,visualstudiocode,macos
+# Edit at https://www.tptal.com/developers/gitignore?templates=go,visualstudiocode,macos
 
 ### Go ###
 # If you prefer the allow list template instead of the deny list, see community template:
@@ -77,3 +77,22 @@ Temporary Items
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,macos
+
+# ====================================================================================
+# TAS Performance Testing Project Specific
+# ====================================================================================
+
+# Ignore environment file with secrets.
+.env
+
+# Ignore generated test result files.
+/results/
+
+# Ignore generated large payload files. They can be recreated with 'make create-payloads'.
+/payloads/
+
+# Ignore compiled Go helper binary.
+/crypto-helper/tas-helper-server
+
+# Ignore Go helper log file.
+go-helper.log
