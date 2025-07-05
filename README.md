@@ -1,16 +1,16 @@
 # TAS Performance Testing
 
-This repository contains a suite of performance testing scripts designed to benchmark a Trusted Artifact Signer (TAS) environment. It uses `k6` to simulate various load scenarios against TAS components, including Fulcio, Rekor, and a Timestamp Authority (TSA).
+This repository contains a suite of performance testing scripts designed to benchmark a Trusted Artifact Signer (TAS) environment. It uses `k6` to simulate various load scenarios and `make` for easy automation.
 
 ## Overview
 
-The primary goal of this project is to provide a standardized and automated way to measure the performance and scalability of a TAS deployment. It includes several predefined test scenarios that simulate different usage patterns, from a simple smoke test to a high-load stress test.
+The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures).
 
-The workflow is orchestrated by a `Makefile` and relies on a custom Go helper application to generate the necessary cryptographic materials on the fly for each virtual user.
+The workflow is orchestrated by a `Makefile` and relies on a custom Go helper application to generate the necessary cryptographic materials on the fly for signing tests.
 
 ## Prerequisites
 
-Before running the tests, ensure you have the following tools installed and configured:
+Before running the tests, ensure you have the following tools installed:
 
 * An OpenShift cluster with a running TAS environment
 * `oc` (OpenShift CLI) logged into your cluster
@@ -20,13 +20,19 @@ Before running the tests, ensure you have the following tools installed and conf
 
 ## How It Works
 
-The testing process is fully automated:
+The testing process is fully automated and handles two primary workflows:
 
-1.  The `make env` command discovers the necessary Fulcio, Rekor, and TSA endpoints from your OpenShift cluster and prompts you for OIDC credentials, creating a `.env` file.
-2.  When a test is initiated (e.g., `make test-smoke`), the `Makefile` first builds and starts the **Go Crypto Helper** service in the background.
-3.  A k6 test script is then executed. Each virtual user in the k6 test requests unique cryptographic materials (keypair, signature, etc.) from the Go helper.
-4.  Using these materials, the k6 script performs a signing workflow against the live TAS endpoints, recording performance metrics.
-5.  Once the test is complete, the Go helper is automatically shut down, and results are saved to the `results/` directory.
+1.  **Signing (`sign` tests):**
+    * When a `sign` test is initiated (e.g., `make smoke`), the `Makefile` first builds and starts the **Go Crypto Helper** service in the background.
+    * The k6 test script then executes. Each virtual user requests unique cryptographic materials from the Go helper.
+    * Using these materials, the k6 script performs a signing workflow against the live TAS endpoints, outputting Rekor UUIDs for each successful entry.
+
+2.  **Verifying (`verify` tests):**
+    * When a `verify` test is initiated (e.g., `make verify-smoke`), the `Makefile` first checks if a list of test data (`rekor_uuids_*.txt`) exists.
+    * If the data file does not exist, it **automatically runs the corresponding signing test** to generate it.
+    * It then runs the k6 verification script, which queries the Rekor and TSA endpoints using the generated data to simulate a realistic read-heavy workload.
+
+Once any test is complete, detailed results are saved as JSON files in the `results/` directory.
 
 ## Quick Start
 
@@ -36,46 +42,54 @@ The testing process is fully automated:
     cd tas-performance-testing
     ```
 
-2.  **Configure the environment:**
-    This command will create a `.env` file by discovering service URLs from your OpenShift cluster and prompting for your OIDC username and password.
+2.  **Run the Automated Setup:**
+    This single command discovers service URLs from your cluster, creates the `.env` file, compiles the Go helper, and generates binary artifact files.
     ```bash
-    make env
+    make setup
     ```
 
-3.  **Build the helper application:**
+3.  **Run a Test:**
+    You are now ready to run any test. For example:
     ```bash
-    make build
-    ```
+    # Run a signing smoke test
+    make smoke
 
-4.  **Generate artifact payloads:**
-    This creates the binary files used for hashing and signing during the tests.
-    ```bash
-    make payloads
-    ```
-
-5.  **Run a test:**
-    You can now run any of the predefined test scenarios. For example, to run a simple smoke test:
-    ```bash
-    make test-smoke
+    # Run a verification smoke test (will auto-generate data if needed)
+    make verify-smoke
     ```
 
 ## Available `make` Commands
 
-* `make env` - Creates the `.env` configuration file from your OpenShift cluster
-* `make build` - Compiles the Go helper application
-* `make payloads` - Generates small and medium artifact files for testing
-* `make test-smoke` - Runs a single-iteration test to verify the setup
-* `make test-load` - Runs a sustained load test simulating a medium enterprise
-* `make test-burst` - Runs a short, high-traffic burst test
-* `make test-stress` - Runs a high-concurrency stress test
-* `make clean` - Removes all generated files (binaries, logs, payloads, and `.env`)
+### Setup
+* `make setup`: Runs `env`, `build`, and `payloads` to prepare the project.
+* `make env`: Creates the `.env` file by discovering service URLs from OpenShift.
+* `make build`: Compiles the Go helper application.
+* `make payloads`: Generates small and medium artifact files for testing.
+
+### Sign Workflows ('Write' Path)
+* `make smoke`: Runs a single-iteration `sign` test.
+* `make load`: Runs the sustained `sign` load test (Medium Enterprise).
+* `make burst`: Runs a high-traffic `sign` burst test.
+* `make stress`: Runs a high-concurrency `sign` stress test.
+
+### Verify Workflows ('Read' Path)
+* `make verify-smoke`: Runs a quick `verify` test using data from the smoke test.
+* `make verify-load`: Runs a sustained `verify` load test using data from the load test.
+
+### Cleanup
+* `make clean`: Removes all generated files (binaries, logs, payloads, results, and `.env`).
 
 ## Test Scenarios
 
-* **Smoke Test:** 1 Virtual User, 1 iteration. Used to ensure the entire workflow is functional.
-* **Medium Enterprise Load Test:** Ramps up to 20 Virtual Users and sustains the load for 5 minutes.
-* **Burst Load Test:** Ramps up to 75 Virtual Users and sustains the load for 2 minutes.
-* **Stress Test:** Runs a sustained load of 200 Virtual Users for 5 minutes.
+### Signing ("Write") Scenarios
+* **Smoke Test:** 1 Virtual User, 1 iteration.
+* **Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
+* **Burst Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
+* **Stress Test:** Ramps to **TBD** VUs over **TBD** minutes.
+
+### Verification ("Read") Scenarios
+* **Verification Smoke Test:** 1 Virtual User, 10 iterations.
+* **Verification Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
 
 ## License
 

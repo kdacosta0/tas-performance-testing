@@ -88,7 +88,7 @@ Temporary Items
 # Ignore generated test result files.
 /results/
 
-# Ignore generated large payload files. They can be recreated with 'make create-payloads'.
+# Ignore generated large payload files.
 /payloads/
 
 # Ignore compiled Go helper binary.
@@ -96,3 +96,6 @@ Temporary Items
 
 # Ignore Go helper log file.
 go-helper.log
+
+# Ignore generated files for verify tests.
+rekor_uuids_*.txt
