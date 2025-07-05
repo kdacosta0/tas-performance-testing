@@ -61,7 +61,7 @@ payloads:
 # --- Data Generation Targets ---
 rekor_uuids_smoke.txt:
 	@echo "Generating UUIDs from smoke test..."
-	@$(MAKE) smoke 2>&1 | grep 'REKOR_ENTRY_UUID' | sed -E 's/.*REKOR_ENTRY_UUID:([0-9a-f]+).*/\1/' > $@
+	@GENERATE_DATA_MODE=true $(MAKE) smoke 2>&1 | grep 'REKOR_ENTRY_UUID' | sed -E 's/.*REKOR_ENTRY_UUID:([0-9a-f]+).*/\1/' > $@
 	@echo "UUID file for smoke verification created"
 
 rekor_uuids_load.txt:
@@ -69,7 +69,7 @@ rekor_uuids_load.txt:
 	@echo "Starting in 5 seconds... (Press Ctrl+C to cancel)"
 	@sleep 5
 	@echo "Generating UUIDs from load test..."
-	@$(MAKE) load 2>&1 | grep 'REKOR_ENTRY_UUID' | sed -E 's/.*REKOR_ENTRY_UUID:([0-9a-f]+).*/\1/' > $@
+	@GENERATE_DATA_MODE=true $(MAKE) load 2>&1 | grep 'REKOR_ENTRY_UUID' | sed -E 's/.*REKOR_ENTRY_UUID:([0-9a-f]+).*/\1/' > $@
 	@echo "UUID file for load verification created"
 
 
