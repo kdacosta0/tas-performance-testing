@@ -2,6 +2,15 @@
 
 This repository contains a suite of performance testing scripts designed to benchmark a Trusted Artifact Signer (TAS) environment. It uses `k6` to simulate various load scenarios and `make` for easy automation.
 
+## Table of Contents
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Available `make` Commands](#available-make-commands)
+- [Test Scenarios](#test-scenarios)
+- [License](#license)
+
 ## Overview
 
 The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures).
