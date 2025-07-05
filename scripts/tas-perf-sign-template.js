@@ -101,14 +101,14 @@ export default function () {
             const res = http.post(REKOR_URL, rekorPayload, {
                 headers: { "Content-Type": "application/json" },
             });
-            if (
-                !check(res, {
-                    "Rekor (hashedrekord) returned HTTP 201": (r) => r.status === 201,
-                })
-            ) {
-                console.error(
-                    `Rekor (hashedrekord) request failed: Status=${res.status}, Body=${res.body}`
-                );
+            if (check(res, { 'Rekor (hashedrekord) returned HTTP 201': (r) => r.status === 201 })) {
+                const location = res.headers['Location'];
+                if (location) {
+                    const uuid = location.split('/').pop();
+                    console.log(`REKOR_ENTRY_UUID:${uuid}`);
+                }
+            } else {
+                console.error(`Rekor (hashedrekord) request failed: Status=${res.status}, Body=${res.body}`);
             }
         });
     });
