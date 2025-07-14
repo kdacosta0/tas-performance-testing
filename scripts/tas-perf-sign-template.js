@@ -28,19 +28,27 @@ function getOidcToken() {
     return res.json("access_token");
 }
 
-export default function () {
+export function setup() {
+    console.log("Fetching a single OIDC token for the entire test run...");
     const authToken = getOidcToken();
     if (!authToken) {
-        fail("Failed to retrieve OIDC token for VU iteration");
+        fail("Failed to retrieve OIDC token during setup. Cannot start the test.");
     }
+    console.log("OIDC Token successfully retrieved. Starting VU iterations.");
+
+    return { token: authToken };
+}
+
+
+export default function (data) {
+    const authToken = data.token;
 
     const FULCIO_URL = __ENV.FULCIO_URL + "/api/v1/signingCert";
     const REKOR_URL = __ENV.REKOR_URL + "/api/v1/log/entries";
-    const payloadSize = __ENV.PAYLOAD_SIZE || "small";
 
     // Fetches pre-generated cryptographic materials from the local helper service
     const helperRes = http.get(
-        `http://localhost:8080/generate-payloads?payload=${payloadSize}`
+        `http://localhost:8080/generate-payloads`
     );
     if (helperRes.status !== 200) {
         fail(

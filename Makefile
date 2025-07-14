@@ -11,7 +11,7 @@ RESULTS_DIR      := ./results
 export
 
 # --- All Available Commands ---
-.PHONY: help setup env build payloads clean \
+.PHONY: help setup env build clean \
         smoke load burst stress \
         verify-smoke verify-load
 
@@ -19,10 +19,9 @@ help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Setup:"
-	@echo "  setup          - Run env, build, and payloads to prepare the project"
+	@echo "  setup          - Run env, and build to prepare the project"
 	@echo "  env            - Create the .env file by discovering service URLs from OpenShift"
 	@echo "  build          - Compile the Go helper application"
-	@echo "  payloads       - Generate small and medium artifact files for testing"
 	@echo ""
 	@echo "Sign Workflows:"
 	@echo "  smoke          - Run a single-iteration sign test"
@@ -35,10 +34,10 @@ help:
 	@echo "  verify-load    - Run a sustained verify load test using data from the load test"
 	@echo ""
 	@echo "Cleanup:"
-	@echo "  clean          - Remove all generated files (binaries, logs, payloads, results, and .env)"
+	@echo "  clean          - Remove all generated files (binaries, logs, results, and .env)"
 
 # --- Setup Commands ---
-setup: env build payloads
+setup: env build
 	@echo "Project setup complete. You are ready to run tests"
 
 env:
@@ -49,14 +48,6 @@ build:
 	@echo "Building Go helper application..."
 	@cd ./crypto-helper && go build -o tas-helper-server .
 	@echo "Build complete"
-
-payloads:
-	@echo "Generating artifact payloads..."
-	@mkdir -p payloads
-	@dd if=/dev/urandom of=payloads/artifact-small.bin bs=1K count=10
-	@dd if=/dev/urandom of=payloads/artifact-medium.bin bs=1M count=50
-	@echo "Payloads generated successfully"
-
 
 # --- Data Generation Targets ---
 rekor_uuids_smoke.txt:
@@ -85,7 +76,6 @@ smoke: build
 	k6 run \
 		--out json=$(RESULTS_DIR)/results-smoke-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--vus 1 --iterations 1 \
-		-e PAYLOAD_SIZE="small" \
 		$(K6_SIGN_SCRIPT)
 
 load: build
@@ -99,7 +89,6 @@ load: build
 	k6 run \
 		--out json=$(RESULTS_DIR)/results-load-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 1m:20 --stage 5m:20 --stage 1m:0 \
-		-e PAYLOAD_SIZE="medium" \
 		$(K6_SIGN_SCRIPT)
 
 burst: build
@@ -113,7 +102,6 @@ burst: build
 	k6 run \
 		--out json=$(RESULTS_DIR)/results-burst-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 30s:75 --stage 2m:75 --stage 30s:0 \
-		-e PAYLOAD_SIZE="medium" \
 		$(K6_SIGN_SCRIPT)
 
 stress: build
@@ -127,7 +115,6 @@ stress: build
 	k6 run \
 		--out json=$(RESULTS_DIR)/results-stress-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 5m:200 \
-		-e PAYLOAD_SIZE="small" \
 		$(K6_SIGN_SCRIPT)
 
 verify-smoke: rekor_uuids_smoke.txt
@@ -152,5 +139,5 @@ verify-load: rekor_uuids_load.txt
 clean:
 	@echo "Cleaning up generated files..."
 	@rm -f $(GO_HELPER_BIN) go-helper.log .env rekor_uuids_*.txt
-	@rm -rf payloads results
+	@rm -rf results
 	@echo "Cleanup complete"

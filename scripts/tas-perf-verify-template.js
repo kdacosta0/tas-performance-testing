@@ -5,19 +5,17 @@ import { b64decode } from 'k6/encoding';
 
 // Simulates a verification workflow using a list of pre-existing Rekor UUIDs.
 const uuidFile = __ENV.REKOR_UUID_FILE || '../rekor_uuids_smoke.txt';
+export const options = {};
 
 // Load Rekor UUIDs to be shared across all VUs.
 const uuids = new SharedArray('rekor-uuids', function () {
     try {
         return open(uuidFile).split('\n').filter(s => s.trim() !== '');
     } catch (e) {
-        // Allows the script to fail gracefully if the file is missing.
         return [''];
     }
 });
 
-// Load profile is set from the Makefile.
-export const options = {};
 
 export default function () {
     // Abort if the UUID file is missing or empty.
