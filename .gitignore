@@ -88,9 +88,6 @@ Temporary Items
 # Ignore generated test result files.
 /results/
 
-# Ignore generated large payload files.
-/payloads/
-
 # Ignore compiled Go helper binary.
 /crypto-helper/tas-helper-server
 

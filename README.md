@@ -70,10 +70,9 @@ Once any test is complete, detailed results are saved as JSON files in the `resu
 ## Available `make` Commands
 
 ### Setup
-* `make setup`: Runs `env`, `build`, and `payloads` to prepare the project.
+* `make setup`: Runs `env`, and `build` to prepare the project.
 * `make env`: Creates the `.env` file by discovering service URLs from OpenShift.
 * `make build`: Compiles the Go helper application.
-* `make payloads`: Generates small and medium artifact files for testing.
 
 ### Sign Workflows ('Write' Path)
 * `make smoke`: Runs a single-iteration `sign` test.
@@ -86,7 +85,7 @@ Once any test is complete, detailed results are saved as JSON files in the `resu
 * `make verify-load`: Runs a sustained `verify` load test using data from the load test.
 
 ### Cleanup
-* `make clean`: Removes all generated files (binaries, logs, payloads, results, and `.env`).
+* `make clean`: Removes all generated files (binaries, logs, results, and `.env`).
 
 ## Test Scenarios
 
