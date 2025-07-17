@@ -33,7 +33,7 @@ export default function () {
     group('Workflow: Verify Signature', function() {
         group('1. Rekor: Get Log Entry by UUID', function () {
             const getEntryUrl = `${REKOR_URL}/api/v1/log/entries/${uuidToVerify}`;
-            const res = http.get(getEntryUrl);
+            const res = http.get(getEntryUrl, {tags: { name: 'Rekor_GetEntryByUUID' },});
 
             const statusOK = check(res, { 'Rekor GET returned HTTP 200': (r) => r.status === 200 });
 
@@ -58,7 +58,9 @@ export default function () {
         // Get the TSA's certificate chain to verify the timestamp.
         group('2. TSA: Get Certificate Chain', function() {
             const certChainUrl = `${TSA_URL}/certchain`;
-            const res = http.get(certChainUrl);
+            const res = http.get(certChainUrl, {
+                tags: { name: 'TSA_GetCertChain' },
+            });
             check(res, { 'TSA GET certchain returned HTTP 200': (r) => r.status === 200 });
         });
     });

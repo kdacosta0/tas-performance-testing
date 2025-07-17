@@ -3,6 +3,7 @@
 # --- Variables ---
 K6_SIGN_SCRIPT   := scripts/tas-perf-sign-template.js
 K6_VERIFY_SCRIPT := scripts/tas-perf-verify-template.js
+K6_MIXED_SCRIPT := scripts/tas-perf-sign-verify-template.js
 GO_HELPER_BIN    := ./crypto-helper/tas-helper-server
 RESULTS_DIR      := ./results
 
@@ -74,7 +75,6 @@ smoke: build
 	sleep 2; \
 	echo "Running smoke test..."; \
 	k6 run \
-		--out json=$(RESULTS_DIR)/results-smoke-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--vus 1 --iterations 1 \
 		$(K6_SIGN_SCRIPT)
 
@@ -87,7 +87,6 @@ load: build
 	sleep 2; \
 	echo "Running medium load test..."; \
 	k6 run \
-		--out json=$(RESULTS_DIR)/results-load-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 1m:20 --stage 5m:20 --stage 1m:0 \
 		$(K6_SIGN_SCRIPT)
 
@@ -100,7 +99,6 @@ burst: build
 	sleep 2; \
 	echo "Running burst load test..."; \
 	k6 run \
-		--out json=$(RESULTS_DIR)/results-burst-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 30s:75 --stage 2m:75 --stage 30s:0 \
 		$(K6_SIGN_SCRIPT)
 
@@ -113,15 +111,25 @@ stress: build
 	sleep 2; \
 	echo "Running stress test..."; \
 	k6 run \
-		--out json=$(RESULTS_DIR)/results-stress-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 5m:200 \
+		$(K6_SIGN_SCRIPT)
+
+endurance: build
+	@echo "Starting Go helper application..."
+	@mkdir -p $(RESULTS_DIR)
+	@$(GO_HELPER_BIN) &> go-helper.log & \
+	HELPER_PID=$$!; \
+	trap 'kill $$HELPER_PID 2>/dev/null || true' EXIT; \
+	sleep 2; \
+	echo "Running endurance test (8 hours at 15 VUs)..."; \
+	k6 run \
+		--stage 1m:15 --stage 8h:15 --stage 2m:0 \
 		$(K6_SIGN_SCRIPT)
 
 verify-smoke: rekor_uuids_smoke.txt
 	@echo "Running verification smoke test..."
 	@mkdir -p $(RESULTS_DIR)
 	@k6 run \
-		--out json=$(RESULTS_DIR)/results-verify-smoke-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--vus 1 --iterations 10 \
 		-e REKOR_UUID_FILE='../rekor_uuids_smoke.txt' \
 		$(K6_VERIFY_SCRIPT)
@@ -130,10 +138,48 @@ verify-load: rekor_uuids_load.txt
 	@echo "Running verification load test..."
 	@mkdir -p $(RESULTS_DIR)
 	@k6 run \
-		--out json=$(RESULTS_DIR)/results-verify-load-$(shell date -u +%Y%m%d-%H%M%S).json \
 		--stage 1m:50 --stage 5m:50 --stage 1m:0 \
 		-e REKOR_UUID_FILE='../rekor_uuids_load.txt' \
 		$(K6_VERIFY_SCRIPT)
+
+mixed-smoke: build
+	@echo "Starting Go helper application..."
+	@mkdir -p $(RESULTS_DIR)
+	@$(GO_HELPER_BIN) &> go-helper.log & \
+	HELPER_PID=$$!; \
+	trap 'kill $$HELPER_PID 2>/dev/null || true' EXIT; \
+	sleep 2; \
+	echo "Running mixed SMOKE test (1 signer, 1 verifier for 10s)..."; \
+	k6 run \
+		-e SIGN_VUS=1 \
+		-e VERIFY_VUS=1 \
+		-e TEST_DURATION=10s \
+		$(K6_MIXED_SCRIPT)
+
+mixed-load: build
+	@echo "Starting Go helper application..."
+	@mkdir -p $(RESULTS_DIR)
+	@$(GO_HELPER_BIN) &> go-helper.log & \
+	HELPER_PID=$$!; \
+	trap 'kill $$HELPER_PID 2>/dev/null || true' EXIT; \
+	sleep 2; \
+	echo "Running mixed workload test (10 signers, 40 verifiers for 10m)..."; \
+	k6 run \
+		$(K6_MIXED_SCRIPT)
+
+mixed-stress: build
+	@echo "Starting Go helper application..."
+	@mkdir -p $(RESULTS_DIR)
+	@$(GO_HELPER_BIN) &> go-helper.log & \
+	HELPER_PID=$$!; \
+	trap 'kill $$HELPER_PID 2>/dev/null || true' EXIT; \
+	sleep 2; \
+	echo "Running mixed STRESS test (50 signers, 200 verifiers for 5m)..."; \
+	k6 run \
+		-e SIGN_VUS=50 \
+		-e VERIFY_VUS=200 \
+		-e TEST_DURATION=5m \
+		$(K6_MIXED_SCRIPT)
 
 # --- Cleanup ---
 clean:

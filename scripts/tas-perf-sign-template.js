@@ -48,7 +48,8 @@ export default function (data) {
 
     // Fetches pre-generated cryptographic materials from the local helper service
     const helperRes = http.get(
-        `http://localhost:8080/generate-payloads`
+        `http://localhost:8080/generate-payloads`,
+        { tags: { name: "Helper_GetCrypto" } }
     );
     if (helperRes.status !== 200) {
         fail(
@@ -73,6 +74,7 @@ export default function (data) {
             });
             const res = http.post(FULCIO_URL, fulcioPayload, {
                 headers: liveHeaders,
+                tags: { name: "Fulcio_RequestCert" },
             });
             if (check(res, { "Fulcio returned HTTP 201": (r) => r.status === 201 })) {
                 // Extracts the PEM certificate from the Fulcio response body
@@ -108,6 +110,7 @@ export default function (data) {
             });
             const res = http.post(REKOR_URL, rekorPayload, {
                 headers: { "Content-Type": "application/json" },
+                tags: { name: "Rekor_CreateHashedRekord" },
             });
             if (
                 check(res, {
@@ -142,7 +145,10 @@ export default function (data) {
             const tsaRes = http.post(
                 "http://localhost:8080/get-timestamp",
                 signatureBytes,
-                { headers: { "Content-Type": "application/octet-stream" } }
+                { 
+                    headers: { "Content-Type": "application/octet-stream" },
+                    tags: { name: "Helper_GetTimestamp" },
+                }
             );
 
             if (
@@ -174,6 +180,7 @@ export default function (data) {
             });
             const res = http.post(REKOR_URL, rekorPayload, {
                 headers: { "Content-Type": "application/json" },
+                tags: { name: "Rekor_CreateRfc3161" },
             });
             if (
                 !check(res, {
