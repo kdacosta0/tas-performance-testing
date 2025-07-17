@@ -13,7 +13,7 @@ This repository contains a suite of performance testing scripts designed to benc
 
 ## Overview
 
-The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures).
+The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures), and a **mixed workload path** that simulates both concurrently.
 
 The workflow is orchestrated by a `Makefile` and relies on a custom Go helper application to generate the necessary cryptographic materials on the fly for signing tests.
 
@@ -41,7 +41,11 @@ The testing process is fully automated and handles two primary workflows:
     * If the data file does not exist, it **automatically runs the corresponding signing test** to generate it.
     * It then runs the k6 verification script, which queries the Rekor and TSA endpoints using the generated data to simulate a realistic read-heavy workload.
 
-Once any test is complete, detailed results are saved as JSON files in the `results/` directory.
+3. **Mixed Workloads (`mixed` tests)**:
+    * This workflow simulates a real-world environment where signing and verification happen at the same time.
+    * The k6 script executes both signing and verification logic within the same test run to measure performance under a combined load.
+
+**TODO** Pipe the output to a file or another tool for analysis.
 
 ## Quick Start
 
@@ -65,6 +69,9 @@ Once any test is complete, detailed results are saved as JSON files in the `resu
 
     # Run a verification smoke test (will auto-generate data if needed)
     make verify-smoke
+
+    # Run a mixed workload test
+    make mixed-load
     ```
 
 ## Available `make` Commands
@@ -76,13 +83,19 @@ Once any test is complete, detailed results are saved as JSON files in the `resu
 
 ### Sign Workflows ('Write' Path)
 * `make smoke`: Runs a single-iteration `sign` test.
-* `make load`: Runs the sustained `sign` load test (Medium Enterprise).
+* `make load`: Runs the sustained `sign` load test.
 * `make burst`: Runs a high-traffic `sign` burst test.
 * `make stress`: Runs a high-concurrency `sign` stress test.
+* `make endurance`: Runs a long-duration `sign` endurance test to check for system stability.
 
 ### Verify Workflows ('Read' Path)
 * `make verify-smoke`: Runs a quick `verify` test using data from the smoke test.
 * `make verify-load`: Runs a sustained `verify` load test using data from the load test.
+
+### Mixed Workflows ('Read/Write' Path)
+* `make mixed-smoke`: Runs a single-iteration test combining both `sign` and `verify` operations to confirm the mixed workload script is functional.
+* `make mixed-load`: Runs a sustained load test with a mixed workload of `sign` and `verify` operations to simulate realistic, concurrent read/write traffic.
+* `make mixed-stress`: Runs a high-concurrency stress test with a mixed workload to determine the system's performance boundaries under extreme read/write pressure.
 
 ### Cleanup
 * `make clean`: Removes all generated files (binaries, logs, results, and `.env`).
@@ -94,11 +107,16 @@ Once any test is complete, detailed results are saved as JSON files in the `resu
 * **Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
 * **Burst Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
 * **Stress Test:** Ramps to **TBD** VUs over **TBD** minutes.
+* **Endurance Test:** Ramps to **TBD** VUs and sustains the load for an extended period (e.g., **TBD** hours) to test system stability over time.
 
 ### Verification ("Read") Scenarios
 * **Verification Smoke Test:** 1 Virtual User, 10 iterations.
 * **Verification Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
 
-## License
+### Mixed Workload ("Read/Write") Scenarios
+* **Mixed Smoke Test:** 1 Virtual User, 10 iterations, executing a 50/50 split of signing and verification operations.
+* **Mixed Load Test:** Ramps to **TBD** VUs, executing a workload of **TBD%** signing and **TBD%** verification operations for **TBD** minutes to simulate realistic traffic.
+* **Mixed Stress Test:** Ramps to a high number of VUs (**TBD**) over **TBD** minutes to find the system's breaking point under a combined read/write workload.
 
+## License
 This project is licensed under the terms included in the [LICENSE](LICENSE) file.
