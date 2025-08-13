@@ -1,6 +1,8 @@
 import http from "k6/http";
 import { check, group, fail } from "k6";
 import { b64encode, b64decode } from "k6/encoding";
+import { Counter } from 'k6/metrics';
+export const errorCounter = new Counter('application_errors_total');
 
 export const options = {};
 
@@ -32,7 +34,8 @@ export function setup() {
     console.log("Fetching a single OIDC token for the entire test run...");
     const authToken = getOidcToken();
     if (!authToken) {
-        fail("Failed to retrieve OIDC token during setup. Cannot start the test.");
+        console.error("Failed to retrieve OIDC token during setup. Cannot start the test.");
+        return;
     }
     console.log("OIDC Token successfully retrieved. Starting VU iterations.");
 
@@ -88,11 +91,14 @@ export default function (data) {
                 console.error(
                     `Fulcio request failed: Status=${res.status}, Body=${res.body}`
                 );
+                errorCounter.add(1, { component: 'fulcio' });
+                return;
             }
         });
 
         if (!fulcioCertificatePEM) {
-            fail("Failed to get certificate from Fulcio, cannot proceed");
+            console.error("Certificate from Fulcio is missing, ending iteration.");
+            errorCounter.add(1, { component: 'fulcio' });
             return;
         }
 
@@ -128,12 +134,15 @@ export default function (data) {
                 console.error(
                     `Rekor (hashedrekord) request failed: Status=${res.status}, Body=${res.body}`
                 );
+                errorCounter.add(1, { component: 'rekor' });
+                return;
             }
         });
     });
 
     if (!artifactSignature_b64) {
-        fail("Failed to get artifact signature, cannot proceed to TSA workflow");
+        console.error("Failed to get artifact signature, cannot proceed to TSA workflow");
+        return;
     }
 
     group("Workflow B: RFC3161 Timestamp Entry", function () {
@@ -161,11 +170,14 @@ export default function (data) {
                 console.error(
                     `TSA helper request failed: Status=${tsaRes.status}, Body=${tsaRes.body}`
                 );
+                errorCounter.add(1, { component: 'tsa' });
+                return;
             }
         });
 
         if (!timestampResponse_b64) {
-            fail("Failed to get timestamp from helper, cannot proceed");
+            console.error("Failed to get timestamp from helper, cannot proceed");
+            return;
         }
 
         group("4. Rekor: Create RFC3161 Entry", function () {
@@ -190,6 +202,8 @@ export default function (data) {
                 console.error(
                     `Rekor (rfc3161) request failed: Status=${res.status}, Body=${res.body}`
                 );
+                errorCounter.add(1, { component: 'rekor' });
+                return;
             }
         });
     });

@@ -1,6 +1,6 @@
 # TAS Performance Testing
 
-This repository contains a suite of performance testing scripts designed to benchmark a Trusted Artifact Signer (TAS) environment. It uses `k6` to simulate various load scenarios and `make` for easy automation.
+This repository contains a suite of performance testing scripts designed to benchmark a Trusted Artifact Signer (TAS) environment. It uses a custom-built `k6` to simulate various load scenarios, reports metrics in real-time to **Prometheus Pushgateway**, and uses `make` for easy automation and orchestration.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -8,115 +8,132 @@ This repository contains a suite of performance testing scripts designed to benc
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
 - [Available `make` Commands](#available-make-commands)
+- [Running a Mixed-Load Test](#running-a-mixed-load-test)
 - [Test Scenarios](#test-scenarios)
 - [License](#license)
 
 ## Overview
 
-The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures), and a **mixed workload path** that simulates both concurrently.
+The primary goal of this project is to provide a standardized way to measure the performance and scalability of a TAS deployment. The test suite is designed to benchmark both the **"write" path** (signing artifacts) and the **"read" path** (verifying signatures).
 
-The workflow is orchestrated by a `Makefile` and relies on a custom Go helper application to generate the necessary cryptographic materials on the fly for signing tests.
+The workflow is orchestrated by a `Makefile` and relies on a custom Go helper application to generate the necessary cryptographic materials on the fly for signing tests. All test results are pushed to a Prometheus Pushgateway instance, allowing for real-time visualization and analysis in Grafana.
 
 ## Prerequisites
 
 Before running the tests, ensure you have the following tools installed:
 
-* An OpenShift cluster with a running TAS environment
-* `oc` (OpenShift CLI) logged into your cluster
-* `k6` for load testing
-* `go` (version 1.18 or newer)
-* `make`
+* An OpenShift cluster with a running TAS environment and the deployed Prometheus Pushgateway.
+* `oc` (OpenShift CLI) logged into your cluster.
+* `go` (version 1.18 or newer).
+* `xk6` for building a custom k6 binary.
+* `make`.
 
 ## How It Works
 
-The testing process is fully automated and handles two primary workflows:
+The testing process is designed to run locally while reporting metrics to a central monitoring stack.
 
-1.  **Signing (`sign` tests):**
-    * When a `sign` test is initiated (e.g., `make smoke`), the `Makefile` first builds and starts the **Go Crypto Helper** service in the background.
-    * The k6 test script then executes. Each virtual user requests unique cryptographic materials from the Go helper.
-    * Using these materials, the k6 script performs a signing workflow against the live TAS endpoints, outputting Rekor UUIDs for each successful entry.
+1.  **Custom k6 Build:** The `setup` process automatically builds a custom `k6` binary using `xk6`. This binary includes a special output extension (`xk6-output-prometheus-pushgateway`) required to send metrics to the Pushgateway.
 
-2.  **Verifying (`verify` tests):**
-    * When a `verify` test is initiated (e.g., `make verify-smoke`), the `Makefile` first checks if a list of test data (`rekor_uuids_*.txt`) exists.
-    * If the data file does not exist, it **automatically runs the corresponding signing test** to generate it.
-    * It then runs the k6 verification script, which queries the Rekor and TSA endpoints using the generated data to simulate a realistic read-heavy workload.
+2.  **Metric Collection:** During a test run (`sign` or `verify`), the custom `k6` binary sends detailed performance metrics (VUs, RPS, Latency, Errors) to the Prometheus Pushgateway URL specified in your `.env` file. Prometheus scrapes this Pushgateway, making the data available for visualization in Grafana.
 
-3. **Mixed Workloads (`mixed` tests)**:
-    * This workflow simulates a real-world environment where signing and verification happen at the same time.
-    * The k6 script executes both signing and verification logic within the same test run to measure performance under a combined load.
+3.  **Signing (`sign` tests):** When a `sign` test is initiated (e.g., `make sign-load`), the `Makefile` first builds and starts the **Go Crypto Helper** service in the background. The k6 script then requests cryptographic materials from this local service for each signing operation.
 
-**TODO** Pipe the output to a file or another tool for analysis.
+4.  **Verifying (`verify` tests):** Verification tests rely on a data file (`rekor_uuids_smoke.txt`) containing entry UUIDs. This file **must be generated manually before** running verification tests using the `make generate-verify-data` command. This decouples data generation from test execution, allowing for flexible and concurrent testing.
 
 ## Quick Start
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/kdacosta0/tas-performance-testing.git
+    git clone [https://github.com/kdacosta0/tas-performance-testing.git](https://github.com/kdacosta0/tas-performance-testing.git)
     cd tas-performance-testing
     ```
 
 2.  **Run the Automated Setup:**
-    This single command discovers service URLs from your cluster, creates the `.env` file, compiles the Go helper, and generates binary artifact files.
+    This single command discovers service URLs from your cluster, creates the `.env` file, and builds both the custom `k6` binary and the Go helper application.
     ```bash
     make setup
     ```
+    You will be prompted for your OIDC credentials, which will be stored in the `.env` file.
 
-3.  **Run a Test:**
-    You are now ready to run any test. For example:
+3.  **Run a Signing Test:**
+    You are now ready to run any signing test.
     ```bash
-    # Run a signing smoke test
-    make smoke
+    # Run a high-concurrency signing stress test
+    make sign-stress
+    ```
+    *Open your Grafana dashboard to observe the results in real-time.*
 
-    # Run a verification smoke test (will auto-generate data if needed)
-    make verify-smoke
+4.  **Run a Verification Test:**
+    This is a two-step process.
+    ```bash
+    # Step 1: Generate the test data (only needs to be done once)
+    make generate-verify-data
 
-    # Run a mixed workload test
-    make mixed-load
+    # Step 2: Run the verification test
+    make verify-stress
     ```
 
 ## Available `make` Commands
 
-### Setup
-* `make setup`: Runs `env`, and `build` to prepare the project.
-* `make env`: Creates the `.env` file by discovering service URLs from OpenShift.
-* `make build`: Compiles the Go helper application.
+### Setup Commands
+* `setup`: (RECOMMENDED) Run all setup tasks: `env`, `build-k6`, `build-helper`.
+* `env`: Configure `.env` file from OpenShift cluster.
+* `build`: Build all necessary binaries (`k6` and Go helper).
+* `build-k6`: Build custom `k6` binary with Pushgateway support.
+* `build-helper`: Build the Go crypto helper application.
 
-### Sign Workflows ('Write' Path)
-* `make smoke`: Runs a single-iteration `sign` test.
-* `make load`: Runs the sustained `sign` load test.
-* `make burst`: Runs a high-traffic `sign` burst test.
-* `make stress`: Runs a high-concurrency `sign` stress test.
-* `make endurance`: Runs a long-duration `sign` endurance test to check for system stability.
+### Signing Workflows
+* `sign-smoke`: Run a single-iteration sign test.
+* `sign-load`: Run the sustained sign load test (20 VUs).
+* `sign-stress`: Run a high-concurrency sign stress test (ramp-up to 200 VUs).
+* `sign-endurance`: Run a long-duration sign endurance test (8 hours).
 
-### Verify Workflows ('Read' Path)
-* `make verify-smoke`: Runs a quick `verify` test using data from the smoke test.
-* `make verify-load`: Runs a sustained `verify` load test using data from the load test.
+### Verify Workflows
+* `verify-load`: Run a sustained verify load test (50 VUs).
+* `verify-stress`: Run a high-concurrency verify stress test (ramp-up to 500 VUs).
 
-### Mixed Workflows ('Read/Write' Path)
-* `make mixed-smoke`: Runs a single-iteration test combining both `sign` and `verify` operations to confirm the mixed workload script is functional.
-* `make mixed-load`: Runs a sustained load test with a mixed workload of `sign` and `verify` operations to simulate realistic, concurrent read/write traffic.
-* `make mixed-stress`: Runs a high-concurrency stress test with a mixed workload to determine the system's performance boundaries under extreme read/write pressure.
+### Utilities
+* `generate-verify-data`: Force regeneration of the `rekor_uuids_smoke.txt` file needed for verify tests.
 
 ### Cleanup
-* `make clean`: Removes all generated files (binaries, logs, results, and `.env`).
+* `clean`: Remove all generated files (binaries, logs, and `.env`).
+
+## Running a Mixed-Load Test
+
+To simulate a realistic workload with both signing and verification happening at the same time, you need to run two tests concurrently in two separate terminals.
+
+1.  **(Run Once) Generate data for verification:**
+    ```bash
+    make generate-verify-data
+    ```
+
+2.  **In Terminal 1, start the verification load:**
+    This creates a constant "read" pressure on the system.
+    ```bash
+    make verify-load
+    ```
+
+3.  **While Terminal 1 is running, start the signing stress test in Terminal 2:**
+    This adds the "write" pressure.
+    ```bash
+    make sign-stress
+    ```
 
 ## Test Scenarios
 
+The `Makefile` provides several pre-configured scenarios based on our findings.
+
 ### Signing ("Write") Scenarios
 * **Smoke Test:** 1 Virtual User, 1 iteration.
-* **Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
-* **Burst Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
-* **Stress Test:** Ramps to **TBD** VUs over **TBD** minutes.
-* **Endurance Test:** Ramps to **TBD** VUs and sustains the load for an extended period (e.g., **TBD** hours) to test system stability over time.
+* **Load Test:** Ramps to 20 VUs over 1 minute, holds the load for 5 minutes.
+* **Burst Test:** Ramps to 150 VUs over 2 minutes.
+* **Stress Test:** Ramps to 200 VUs over 5 minutes.
+* **Endurance Test:** Ramps to 15 VUs and sustains the load for 8 hours.
 
 ### Verification ("Read") Scenarios
-* **Verification Smoke Test:** 1 Virtual User, 10 iterations.
-* **Verification Load Test:** Ramps to **TBD** VUs and sustains the load for **TBD** minutes.
-
-### Mixed Workload ("Read/Write") Scenarios
-* **Mixed Smoke Test:** 1 Virtual User, 10 iterations, executing a 50/50 split of signing and verification operations.
-* **Mixed Load Test:** Ramps to **TBD** VUs, executing a workload of **TBD%** signing and **TBD%** verification operations for **TBD** minutes to simulate realistic traffic.
-* **Mixed Stress Test:** Ramps to a high number of VUs (**TBD**) over **TBD** minutes to find the system's breaking point under a combined read/write workload.
+* **Smoke Test:** 1 Virtual User, 1 iteration.
+* **Load Test:** Ramps to 50 VUs over 1 minute, holds the load for 5 minutes.
+* **Stress Test:** Ramps to 500 VUs over 5 minutes.
 
 ## License
 This project is licensed under the terms included in the [LICENSE](LICENSE) file.

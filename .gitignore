@@ -96,3 +96,6 @@ go-helper.log
 
 # Ignore generated files for verify tests.
 rekor_uuids_*.txt
+
+# Ignore generated custom k6 binary.
+k6

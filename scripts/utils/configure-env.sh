@@ -80,7 +80,7 @@ check_and_set_url "FULCIO_URL" "oc get fulcio -o jsonpath='{.items[0].status.url
 check_and_set_url "REKOR_URL" "oc get rekor -o jsonpath='{.items[0].status.url}'"
 check_and_set_url "OIDC_ISSUER_URL" "oc get route keycloak -n keycloak-system --no-headers | awk '{print \$2}'" "https://" "/auth/realms/trusted-artifact-signer"
 check_and_set_url "TSA_URL" "oc get timestampauthorities -o jsonpath='{.items[0].status.url}'" "" "/api/v1/timestamp"
-
+check_and_set_url "K6_PUSHGATEWAY_URL" "oc get route pushgateway -o jsonpath='{.spec.host}'" "https://" ""
 
 # Set the static OIDC client ID if not already present.
 if ! grep -q "^export OIDC_CLIENT_ID=" "$ENV_FILE"; then
